@@ -17,6 +17,22 @@ rA = 9;
 rB = 5;
 rC = 7;
 
+
+if ( pA != [0,0,0]){
+   echo ("ERROR: pA must be at the origin");
+   assert(false);
+}
+
+if ( (pB[2] !=0 ) || pC[2] !=0){
+   echo("ERROR: all sphere centers must be in z = 0 plane");
+   assert(false);
+}
+
+if (pB[1] != 0){
+   echo("pB centre must be on the x axis");
+   assert(false);
+}
+
 // show the spheres
 module spheres(){
    translate (pA){
@@ -32,7 +48,7 @@ module spheres(){
    }
 }
 
-function unit_vector( v) = v  * 1 / norm(v);
+function unit_vector( v) = v / norm(v);
 
 ex = unit_vector(pB - pA) ;
 echo(ex = ex);
@@ -52,12 +68,14 @@ echo (j = j);
 x = (pow(rA,2) - pow(rB,2) + pow(d,2)) / (2 * d);
 echo( x = x);
 
+// size of the cube to subtract to show 
+// the intersection of the spheres
 cube_size = [10,10,10];
 
-if ( (d - rA >= rB) || ( rB >= ( d + rA)) ){
+if ( ((d - rA) >= rB) || ( rB >= ( d + rA)) ){
    echo ("Error Y not solvable");
 }else{
-   y = (( pow(rA,2) - pow(rC,2) + pow(i,2) + pow(j,2)) / (2* j))
+   y = (( pow(rA,2) - pow(rC,2) + pow(i,2) + pow(j,2)) / (2 * j))
       - ( i / j) * x;
    echo(y = y);
    zpow2 = pow(rA,2) - pow(x,2) - pow(y,2);
