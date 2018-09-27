@@ -17,13 +17,12 @@ rA = 9;
 rB = 5;
 rC = 7;
 
-
 if ( pA != [0,0,0]){
    echo ("ERROR: pA must be at the origin");
    assert(false);
 }
 
-if ( (pB[2] !=0 ) || pC[2] !=0){
+if ( (pB[2] !=0 ) || (pC[2] !=0)){
    echo("ERROR: all sphere centers must be in z = 0 plane");
    assert(false);
 }
@@ -74,6 +73,7 @@ cube_size = [10,10,10];
 
 if ( ((d - rA) >= rB) || ( rB >= ( d + rA)) ){
    echo ("Error Y not solvable");
+   spheres();
 }else{
    y = (( pow(rA,2) - pow(rC,2) + pow(i,2) + pow(j,2)) / (2 * j))
       - ( i / j) * x;
@@ -81,6 +81,7 @@ if ( ((d - rA) >= rB) || ( rB >= ( d + rA)) ){
    zpow2 = pow(rA,2) - pow(x,2) - pow(y,2);
    if ( zpow2 < 0){
       echo ("z not solvable");
+      spheres();
    }else{
       z = sqrt(zpow2);
       echo (z = z);
