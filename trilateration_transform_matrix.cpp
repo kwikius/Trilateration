@@ -25,7 +25,10 @@
 #include <quan/fun/display_matrix.hpp>
 #include <fstream>
 
+// calc diagnostic output
 #define DEBUG_PRINT
+// to remove unnecessary calcs ( otherwise useful for exposition )
+#define MINIMAL_VECT_CALCS
 
 namespace {
 
@@ -112,10 +115,10 @@ namespace quan{ namespace fusion{
          struct apply {
             typedef typename quan::meta::binary_op<int, quan::meta::divides,Q>::type div_q;
             typedef quan::fun::vector<
-               int,int, int, div_q,
-               int,int, int, div_q,
-               int,int, int, div_q,
-               Q, Q, Q, int
+               int, int, int, div_q,
+               int, int, int, div_q,
+               int, int, int, div_q,
+               Q  ,   Q,   Q,   int
             > vect_type;
 
             typedef quan::fun::matrix<4,4,vect_type> type;
@@ -126,10 +129,10 @@ namespace quan{ namespace fusion{
          operator()( quan::three_d::vect<Q> const & in) const
          {
             return quan::fusion::make_matrix<4>(
-               1,0,0,0/Q{1},
-               0,1,0,0/Q{1},
-               0,0,1,0/Q{1},
-               in.x, in.y, in.z, 1
+                  1,   0,     0, 0/Q{1},
+                  0,    1,    0, 0/Q{1},
+                  0,    0,    1, 0/Q{1},
+               in.x, in.y, in.z,      1
             );
          }
       };
@@ -141,10 +144,10 @@ namespace quan{ namespace fusion{
             typedef typename quan::meta::binary_op<int, quan::meta::divides,Q>::type div_q;
             typedef QUAN_FLOAT_TYPE float_type;
             typedef quan::fun::vector<
-               int,int, int, div_q,
+               int,       int,        int, div_q,
                int,float_type, float_type, div_q,
                int,float_type, float_type, div_q,
-               Q, Q, Q, int
+                 Q,         Q,          Q,   int
             > vect_type;
 
             typedef quan::fun::matrix<4,4,vect_type> type;
@@ -155,10 +158,68 @@ namespace quan{ namespace fusion{
          operator()( Q const & , quan::angle::rad theta) const
          {
             return quan::fusion::make_matrix<4>(
-               1,0,0,0/Q{1},
-               0,cos(theta),sin(theta),0/Q{1},
-               0,-sin(theta),cos(theta),0/Q{1},
-               Q{}, Q{}, Q{}, 1
+                 1,          0,          0, 0/Q{1},
+                 0, cos(theta), sin(theta), 0/Q{1},
+                 0,-sin(theta), cos(theta), 0/Q{1},
+               Q{},        Q{},        Q{},      1
+            );
+         }
+      };
+
+      struct make_3d_y_rotation_matrix_impl{
+
+         template <typename Q>
+         struct apply {
+            typedef typename quan::meta::binary_op<int, quan::meta::divides,Q>::type div_q;
+            typedef QUAN_FLOAT_TYPE float_type;
+            typedef quan::fun::vector<
+               float_type, int, float_type, div_q,
+               int       , int,        int, div_q,
+               float_type, int, float_type, div_q,
+                        Q,   Q,          Q,   int
+            > vect_type;
+
+            typedef quan::fun::matrix<4,4,vect_type> type;
+         };
+
+         template <typename Q>
+         typename apply<Q>::type
+         operator()( Q const & , quan::angle::rad theta) const
+         {
+            return quan::fusion::make_matrix<4>(
+               cos(theta),   0,sin(theta), 0/Q{1},
+                        0,   1,          0, 0/Q{1},
+               -sin(theta),   0, cos(theta), 0/Q{1},
+                      Q{}, Q{},        Q{},      1
+            );
+         }
+      };
+
+       struct make_3d_z_rotation_matrix_impl{
+
+         template <typename Q>
+         struct apply {
+            typedef typename quan::meta::binary_op<int, quan::meta::divides,Q>::type div_q;
+            typedef QUAN_FLOAT_TYPE float_type;
+            typedef quan::fun::vector<
+               float_type, float_type, int, div_q,
+               float_type, float_type, int, div_q,
+                      int,        int, int, div_q,
+                        Q,          Q,   Q,   int
+            > vect_type;
+
+            typedef quan::fun::matrix<4,4,vect_type> type;
+         };
+
+         template <typename Q>
+         typename apply<Q>::type
+         operator()( Q const & , quan::angle::rad theta) const
+         {
+            return quan::fusion::make_matrix<4>(
+                cos(theta), sin(theta),   0, 0/Q{1},
+               -sin(theta), cos(theta),   0, 0/Q{1},
+                         0,          0,   1, 0/Q{1},
+                       Q{},        Q{}, Q{},      1
             );
          }
       };
@@ -198,6 +259,22 @@ namespace quan{ namespace fusion{
 
    template <typename Q>
    inline
+   typename detail::make_3d_y_rotation_matrix_impl::apply<Q>::type
+   make_3d_y_rotation_matrix(quan::angle::rad const & theta)
+   {
+      return detail::make_3d_y_rotation_matrix_impl{} (Q{}, theta);
+   }
+
+   template <typename Q>
+   inline
+   typename detail::make_3d_z_rotation_matrix_impl::apply<Q>::type
+   make_3d_z_rotation_matrix(quan::angle::rad const & theta)
+   {
+      return detail::make_3d_z_rotation_matrix_impl{} (Q{}, theta);
+   }
+
+   template <typename Q>
+   inline
    typename detail::make_3d_column_matrix_impl::apply<Q>::type
    make_column_matrix(quan::three_d::vect<Q> const & in)
    {
@@ -208,7 +285,6 @@ namespace quan{ namespace fusion{
 
 bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out)
 {
-
    auto const pA0 = A.centre;
    auto const pB0 = B.centre;
    auto const pC0 = C.centre;
@@ -225,14 +301,14 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
    auto const pC1 = pC0 - pA0;
 
 //#######################################################################
-   auto translate_mx_in = quan::fusion::make_translation_matrix(-A.centre);
+   auto mt = quan::fusion::make_translation_matrix(-A.centre);
 
-   display(translate_mx_in,"translation_matrix");
+   display(mt,"translation_matrix");
 
    auto  pB0v = quan::fusion::make_column_matrix(B.centre);
    display(pB0v,"pB0v = ");
 
-   auto pB1v = pB0v * translate_mx_in   ;
+   auto pB1v = pB0v * mt   ;
 
    display(pB1v, "pB1v = ");
 
@@ -253,6 +329,12 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
 #endif
    quan::three_d::y_rotation y_rotate{-y_angle};
 
+   //######################################################
+   auto mry = quan::fusion::make_3d_y_rotation_matrix<quan::length::km>(-y_angle);
+
+   auto pB2v = pB1v * mry;
+   display(pB2v, "pB2v = ");
+   //######################################################
    auto const pA2 = y_rotate(pA1); 
    auto const pB2 = y_rotate(pB1); 
    auto const pC2 = y_rotate(pC1);
@@ -273,6 +355,12 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
    std::cout << "rotate around z-axis by " << z_angle << " so that pB.y == 0\n";
 #endif
    quan::three_d::z_rotation z_rotate{-z_angle};
+   //######################################################
+   auto mrz = quan::fusion::make_3d_z_rotation_matrix<quan::length::km>(-z_angle);
+
+   auto pB3v = pB2v * mrz;
+   display(pB3v, "pB3v = ");
+   //######################################################
 
    auto const pA3 = z_rotate(pA2); 
    auto const pB3 = z_rotate(pB2); 
@@ -299,12 +387,21 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
 
    auto mrx = quan::fusion::make_3d_x_rotation_matrix<quan::length::km>(-x_angle);
    display(mrx, "mrx = " ) ;
-   auto  pB3v = quan::fusion::make_column_matrix(pB3);
-   display(pB3v,"pB3v = ");
+  // auto  pB4v = quan::fusion::make_column_matrix(pB3);
+  // display(pB3v,"pB3v = ");
 
    auto pB4v = pB3v * mrx  ;
    display(pB4v, "pB4v = ");
   //###################################################################################
+
+ //  auto mxtot = mrx * mrz * mry * mt;
+   auto mxtot = mt * mry * mrz * mrx;
+
+   display(mxtot,"mxtot = ");
+
+   auto pb4vv = pB0v * mxtot;
+
+   display(pb4vv,"pb4vv = ");
 
    auto const pA4 = x_rotate(pA3); 
    auto const pB4 = x_rotate(pB3); 
@@ -326,6 +423,21 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
    if ( !ll_trilaterate(sphere{pA4,A.radius},sphere{pB4,B.radius},sphere{pC4,C.radius},ip4)){
       return false;
    }
+
+   //#######################################################################
+   auto mrx_dash = quan::fusion::make_3d_x_rotation_matrix<quan::length::km>(x_angle);
+   auto mrz_dash = quan::fusion::make_3d_z_rotation_matrix<quan::length::km>(z_angle);
+   auto mry_dash = quan::fusion::make_3d_y_rotation_matrix<quan::length::km>(y_angle);
+   auto mt_dash = quan::fusion::make_translation_matrix(A.centre);
+
+   auto mxtot_dash = mrx_dash * mrz_dash * mry_dash * mt_dash;
+
+   auto ip4v = quan::fusion::make_column_matrix(ip4);
+
+   auto ip0v = ip4v * mxtot_dash;
+   display(ip0v,"ip0v = ");
+
+   //#######################################################################
 
    quan::three_d::x_rotation x_unrotate(x_angle);
 
@@ -379,8 +491,7 @@ void output_scad_preamble(std::ostream & out)
 
 int main()
 {
-   
-
+  
    sphere A{{4_km, 5_km,6_km},7.0_km};;
    sphere B{{13_km, 4.5_km, 5.5_km},5.0_km};
    sphere C{{10_km,11_km,5.6_km},7.0_km};
