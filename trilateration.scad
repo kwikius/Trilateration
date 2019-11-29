@@ -10,10 +10,10 @@
 pA = [0,0,0];
 // -- pB is on the x axis
 pB = [10,0,0];
-pC = [9,7,0];
+pC = [7,7,0];
 
 // rA , rB and rC are the radii of the spheres
-rA = 9;
+rA = 8;
 rB = 5;
 rC = 7;
 
