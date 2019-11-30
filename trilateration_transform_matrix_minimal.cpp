@@ -15,8 +15,10 @@
 #include <quan/fusion/make_3d_x_rotation_matrix.hpp>
 #include <quan/fusion/make_3d_y_rotation_matrix.hpp>
 #include <quan/fusion/make_3d_z_rotation_matrix.hpp>
-#include <quan/fusion/make_column_matrix.hpp>
+#include <quan/fusion/make_row_matrix.hpp>
 #include <quan/fun/display_matrix.hpp>
+#include <quan/fusion/static_value/out/static_value.hpp>
+#include <quan/fun/as_vect3d.hpp>
 #include <fstream>
 
 // calc diagnostic output
@@ -25,8 +27,8 @@
 //#define SHOW_VECT_CALC
 //#define SHOW_MATRIX_CALC
 
-//#define USE_MATRIX_CALC
-#define USE_VECT_CALC
+#define USE_MATRIX_CALC
+//#define USE_VECT_CALC
 
 #if defined (USE_VECT_CALC) && defined(USE_MATRIX_CALC)
 #error choose calc
@@ -108,7 +110,7 @@ namespace {
    }
 
 }
-
+#if 0
 namespace quan{ namespace fun{
     
    template <typename M>
@@ -128,6 +130,8 @@ namespace quan{ namespace fun{
    }
 
 }}
+
+#endif
 
 bool trilaterate_verify(sphere const& A, sphere const & B, sphere const & C)
 {
@@ -185,9 +189,9 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
    }
 
 #if defined WANT_MATRIX_CALC
-   auto const pA0v = quan::fusion::make_column_matrix(A.centre);
-   auto const pB0v = quan::fusion::make_column_matrix(B.centre);
-   auto const pC0v = quan::fusion::make_column_matrix(C.centre);
+   auto const pA0v = quan::fusion::make_row_matrix(A.centre);
+   auto const pB0v = quan::fusion::make_row_matrix(B.centre);
+   auto const pC0v = quan::fusion::make_row_matrix(C.centre);
 #endif
 
 #if defined DEBUG_PRINT
@@ -342,9 +346,9 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
    point ip_norm;
 #if defined WANT_MATRIX_CALC
    if ( !ll_trilaterate(
-             sphere{to_vect3D(pAv_norm),A.radius}
-            ,sphere{to_vect3D(pBv_norm),B.radius}
-            ,sphere{to_vect3D(pCv_norm),C.radius}
+             sphere{as_vect3d(pAv_norm),A.radius}
+            ,sphere{as_vect3d(pBv_norm),B.radius}
+            ,sphere{as_vect3d(pCv_norm),C.radius}
             ,ip_norm
          )
    ){
@@ -364,9 +368,9 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
 
    auto mxtot_dash = mrx_dash * mrz_dash * mry_dash * mt_dash;
 
-   auto ipv_norm = quan::fusion::make_column_matrix(ip_norm);
+   auto ipv_norm = quan::fusion::make_row_matrix(ip_norm);
    auto ip0v = ipv_norm * mxtot_dash;
-   out = to_vect3D(ip0v);
+   out = as_vect3d(ip0v);
 #else
    quan::three_d::x_rotation x_unrotate(x_angle);
    point const ip3 = x_unrotate(ip_norm);
@@ -398,7 +402,7 @@ void output_scad_preamble(std::ostream & out)
 int main()
 {
   
-   sphere A{{4_km, 5_km,6_km},7.5_km};;
+   sphere A{{4.3_km, 5_km,6_km},7.5_km};;
    sphere B{{13_km, 4.5_km, 5.5_km},5.0_km};
    sphere C{{10_km,11_km,5.6_km},7.0_km};
 #if defined DEBUG_PRINT

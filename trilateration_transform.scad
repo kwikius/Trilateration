@@ -13,7 +13,7 @@ module show_sphere(pos,radius)
 
 color("blue"){
    // sphere A
-   show_sphere([4, 5, 6], 7.5);
+   show_sphere([4.3, 5, 6], 7.5);
    // sphere B
    show_sphere([10, 11, 5.6], 7);
    // sphere C
@@ -22,6 +22,6 @@ color("blue"){
 
 color("yellow"){
    // sphere at intersection point
-   show_sphere([10.4923, 5.37433, 9.73637], 1);
+   show_sphere([10.7231, 5.47923, 9.84244], 1);
 }
 
