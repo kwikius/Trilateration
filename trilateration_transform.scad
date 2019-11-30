@@ -12,12 +12,16 @@ module show_sphere(pos,radius)
 }
 
 color("blue"){
+   // sphere A
    show_sphere([4, 5, 6], 7.5);
+   // sphere B
    show_sphere([10, 11, 5.6], 7);
+   // sphere C
    show_sphere([13, 4.5, 5.5], 5);
 }
 
 color("yellow"){
+   // sphere at intersection point
    show_sphere([10.4923, 5.37433, 9.73637], 1);
 }
 

@@ -22,7 +22,7 @@
 // calc diagnostic output
 #define DEBUG_PRINT
 
-//#define SHOW_MATRIX_CALC
+#define SHOW_MATRIX_CALC
 
 namespace {
 
@@ -342,19 +342,25 @@ int main()
         output_scad_preamble(out);
 
         out << "color(\"blue\"){\n";
+        out << "   // sphere A\n";
         out << "   show_sphere(" << A.centre/1_km << ", " << A.radius.numeric_value() << ");\n";
+       out <<  "   // sphere B\n";
         out << "   show_sphere(" << C.centre/1_km << ", " << C.radius.numeric_value() << ");\n";
+       out <<  "   // sphere C\n";
         out << "   show_sphere(" << B.centre/1_km << ", " << B.radius.numeric_value() << ");\n"; 
         out << "}\n\n";
 
         out << "color(\"yellow\"){\n";
+        out << "   // sphere at intersection point\n";
         out << "   show_sphere(" << intersection_point / 1_km << ", 1);\n";
         out << "}\n\n";
      }
 
-     std::cout << "result output to \"trilateration_transform.scad\"" << std::endl;
-     int result = system("openscad trilateration_transform.scad");
-     return result;
+     std::cout << "result output to \"trilateration_transform.scad\"\n"; 
+     std::cout << "...opening in openscad" << std::endl;
+
+     return  system("openscad trilateration_transform.scad");
+
    }else{
       std::cout << "failed to trilaterate\n";
    }
