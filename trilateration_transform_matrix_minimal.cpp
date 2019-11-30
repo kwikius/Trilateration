@@ -22,7 +22,29 @@
 // calc diagnostic output
 #define DEBUG_PRINT
 
-#define SHOW_MATRIX_CALC
+//#define SHOW_VECT_CALC
+//#define SHOW_MATRIX_CALC
+
+//#define USE_MATRIX_CALC
+#define USE_VECT_CALC
+
+#if defined (USE_VECT_CALC) && defined(USE_MATRIX_CALC)
+#error choose calc
+#endif
+
+#if ! (defined (USE_VECT_CALC) || defined(USE_MATRIX_CALC))
+#error need 1 or other calc
+#endif
+
+#if defined(SHOW_MATRIX_CALC) || defined (USE_MATRIX_CALC)
+#define WANT_MATRIX_CALC
+#endif
+
+#if defined(SHOW_VECT_CALC) || defined (USE_VECT_CALC)
+#define WANT_VECT_CALC
+#endif
+
+
 
 namespace {
 
@@ -40,8 +62,6 @@ namespace {
 
    auto constexpr epsilon_km = 1.e-6_km;
 
-// to remove unnecessary calcs ( otherwise useful for exposition )
-#define MINIMAL_CALCS
    // A B C must be normalised
    // where A is centred at origin
    // B is centred on x axis
@@ -53,22 +73,15 @@ namespace {
       assert(abs(B.centre.z) < epsilon_km);
       assert(abs(C.centre.z) < epsilon_km); 
 
-#if defined MINIMAL_CALCS
       auto const ex = unit_vector(B.centre);   // direction of B to origin
       auto const i = dot_product(ex,(C.centre));   
       auto const ey = unit_vector(C.centre - i * ex) ;
       auto const d = magnitude(B.centre);       // distance B to origin
       auto const j = dot_product(ey,C.centre);
-#else
-      auto const ex = unit_vector(B.centre-A.centre);
-      auto const i = dot_product(ex,(C.centre- A.centre));
-      auto const ey = unit_vector(C.centre - A.centre - i * ex) ;
-      auto const d = magnitude(B.centre - A.centre);
-      auto const j = dot_product(ey,C.centre - A.centre);
-#endif
       auto const x = (quan::pow<2>(A.radius) - quan::pow<2>(B.radius) + quan::pow<2>(d)) / ( 2 * d);
 
-      if ( ((d - A.radius) >= B.radius ) || (B.radius >= (d + A.radius))){
+      if ( ( (d - A.radius) >= B.radius ) || ( B.radius >= (d + A.radius) ) ){
+         // shouldnt get here as was checked in parent function
          std::cout << "y : no solution\n";
          return false;
       }
@@ -84,10 +97,9 @@ namespace {
 
          intersection_point = point{x,y,z};
    #if defined DEBUG_PRINT
-         std::cout << "ll intersection point = " << intersection_point << '\n';
+   //      std::cout << "ll intersection point = " << intersection_point << '\n';
    #endif
          return true;
-        
       }else{
          std::cout << "z : no solution\n";
          return false;
@@ -97,160 +109,254 @@ namespace {
 
 }
 
+namespace quan{ namespace fun{
+    
+   template <typename M>
+   inline
+   typename quan::where_< 
+      quan::meta::and_<
+         quan::fun::is_fun_matrix<M>
+         ,quan::meta::bool_< (quan::fusion::num_rows<M> == 1)>
+         ,quan::meta::bool_<(quan::fusion::num_columns<M> == 4)>
+      >,
+      quan::three_d::vect<typename quan::fusion::matrix_at_t<0,0,M>::type>
+   >::type
+   to_vect3D( M const & in)
+   {
+       typedef typename quan::fusion::matrix_at_t<0,0,M>::type value_type;
+       return quan::three_d::vect<value_type>{in. template at<0,0>(),in. template at<0,1>(),in. template at<0,2>()};
+   }
+
+}}
+
+bool trilaterate_verify(sphere const& A, sphere const & B, sphere const & C)
+{
+   auto const distAB = magnitude(A.centre-B.centre);
+   if (  distAB < epsilon_km ){
+      std::cout << "A and B are coincident\n";
+      return false;
+   }
+   if ( distAB >= (A.radius + B.radius) ){
+      std::cout << "A and B dont intersect\n";
+      return false;
+   }
+   auto const distBC = magnitude(B.centre-C.centre);
+   if (  distBC < epsilon_km ){
+      std::cout << "B and C are coincident\n";
+      return false;
+   }
+   if ( distBC >= (B.radius + C.radius) ){
+      std::cout << "B and C dont intersect\n";
+      return false;
+   }
+   auto const distAC = magnitude(A.centre-C.centre);
+   if ( distAC  < epsilon_km ){
+      std::cout << "A and C are coincident\n";
+      return false;
+   }
+   if ( distAC >= (A.radius + C.radius) ){
+      std::cout << "A and C dont intersect\n";
+      return false;
+   }
+   return true;
+        
+}
+/*
+  to align for matrix calc
+  B1, C1  <- translate B,C by -A.centre
+  mt 
+  read y_angle  ( atan2(B1.z,B1.x))
+  B2, C2 <- rotate B1,C1 around y by yangle
+  my
+  read z_angle (atan2(pB2.y, pB2.x)
+  C3 <-- rotate C2 around z by z_angle
+  mz
+  read x_angle ( atan2(C3.z, C3.y)
+   
+  // that gets angles to rotate by
+  // if want matrix then make matrix mt * my * mz * mx
+  // apply to point
+*/
+
 bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out)
 {
-   auto const pA0 = A.centre;
-   auto const pB0 = B.centre;
-#if defined SHOW_MATRIX_CALC
-   auto  pB0v = quan::fusion::make_column_matrix(B.centre);
-#endif
-
-   auto const pC0 = C.centre;
-#if defined DEBUG_PRINT
-   std::cout << "pA0 = " << pA0 << '\n';
-   std::cout << "pB0 = " << pB0 << '\n';
-#if defined SHOW_MATRIX_CALC
-   display(pB0v,"pB0v = ");
-#endif
-   std::cout << "pC0 = " << pC0 << '\n';
-   // transform1
-   std::cout << "translate pA to origin\n";
-#endif
-   auto const pA1 = pA0 - pA0;
-   auto const pB1 = pB0 - pA0;
-   auto const pC1 = pC0 - pA0;
-#if defined SHOW_MATRIX_CALC
-//#######################################################################
-   auto mt = quan::fusion::make_translation_matrix(-A.centre);
-
-   display(mt,"translation_matrix");
-
-
-
-   auto pB1v = pB0v * mt   ;
-//#############################################################
-#endif
-
-#if defined DEBUG_PRINT
-   std::cout << "pA1 = " << pA1 << '\n';
-   std::cout << "pB1 = " << pB1 << '\n';
-#if defined SHOW_MATRIX_CALC
-   display(pB1v, "pB1v = ");
-#endif
-   std::cout << "pC1 = " << pC1 << '\n';
-#endif
-   assert ( (pA1 == point{0_km,0_km,0_km}) );
-
-   // transform 2 ---------------------------------
-   assert( abs(pB1.x) > epsilon_km);
-   auto const y_angle = quan::angle::deg(quan::atan2(pB1.z,pB1.x));
-#if defined DEBUG_PRINT
-   std::cout << "rotate around y-axis by " << y_angle << " so that pB.z == 0)\n";
-#endif
-   quan::three_d::y_rotation y_rotate{-y_angle};
-
-#if defined SHOW_MATRIX_CALC
-   //######################################################
-   auto mry = quan::fusion::make_3d_y_rotation_matrix<quan::length::km>(-y_angle);
-   auto pB2v = pB1v * mry;
-   //######################################################
-#endif
-   auto const pA2 = y_rotate(pA1); 
-   auto const pB2 = y_rotate(pB1); 
-
-   auto const pC2 = y_rotate(pC1);
-
-#if defined DEBUG_PRINT
-   std::cout << "pA2 = " << pA2 << '\n';
-   std::cout << "pB2 = " << pB2 << '\n';
-#if defined SHOW_MATRIX_CALC
-   display(pB2v, "pB2v = ");
-#endif
-   std::cout << "pC2 = " << pC2 << '\n';
-#endif
-   assert((pA2 == point{0_km,0_km,0_km}));
-   assert(abs(pB2.z) < epsilon_km);
-
-   // transform 3
-   assert( abs(pB2.x) > epsilon_km);
-   auto const z_angle = quan::angle::deg(quan::atan2(pB2.y,pB2.x));
-#if defined DEBUG_PRINT
-   std::cout << "rotate around z-axis by " << z_angle << " so that pB.y == 0\n";
-#endif
-   quan::three_d::z_rotation z_rotate{-z_angle};
-#if defined SHOW_MATRIX_CALC
-   //######################################################
-   auto mrz = quan::fusion::make_3d_z_rotation_matrix<quan::length::km>(-z_angle);
-   auto pB3v = pB2v * mrz;
-   //######################################################
-#endif
-
-   auto const pA3 = z_rotate(pA2); 
-   auto const pB3 = z_rotate(pB2); 
-   auto const pC3 = z_rotate(pC2);
-
-#if defined DEBUG_PRINT
-   std::cout << "pA3 = " << pA3 << '\n';
-   std::cout << "pB3 = " << pB3 << '\n';
-#if defined SHOW_MATRIX_CALC
-   display(pB3v, "pB3v = ");
-#endif
-   std::cout << "pC3 = " << pC3 << '\n';
-#endif
-
-   assert((pA3 == point{0_km,0_km,0_km}));
-   assert(abs(pB3.z) < epsilon_km);
-   assert(abs(pB3.y) < epsilon_km); 
-
-   assert( abs(pC3.x) > epsilon_km);
-   auto const x_angle = quan::angle::deg(quan::atan2(pC3.z,pC3.y));
-#if defined DEBUG_PRINT
-   std::cout << "rotate around x-axis by " << x_angle << " so that pC.z == 0\n";
-#endif
-   quan::three_d::x_rotation x_rotate{-x_angle};
-
-#if defined SHOW_MATRIX_CALC
-   //################################################################################
-
-   auto mrx = quan::fusion::make_3d_x_rotation_matrix<quan::length::km>(-x_angle);
-   display(mrx, "mrx = " ) ;
-
-   auto pB4v = pB3v * mrx  ;
-
-   auto mxtot = mt * mry * mrz * mrx;
-
-   display(mxtot,"mxtot = ");
-
-   auto pb4vv = pB0v * mxtot;
-  //###################################################################################
-#endif
-   auto const pA4 = x_rotate(pA3); 
-   auto const pB4 = x_rotate(pB3); 
-   auto const pC4 = x_rotate(pC3);
-
-#if defined DEBUG_PRINT
-   std::cout << "pA4 = " << pA4 << '\n';
-   std::cout << "pB4 = " << pB4 << '\n';
-#if defined SHOW_MATRIX_CALC
-   display(pB4v, "pB4v = ");
-   display(pb4vv,"pb4vv ( calced from totala matrix) = ");
-#endif
-   std::cout << "pC4 = " << pC4 << '\n';
-#endif
-
-   assert((pA4 == point{0_km,0_km,0_km}));
-   assert(abs(pB4.z) < epsilon_km);
-   assert(abs(pB4.y) < epsilon_km); 
-   assert(abs(pC4.z) < epsilon_km);
-
-   point ip4;
-
-   if ( !ll_trilaterate(sphere{pA4,A.radius},sphere{pB4,B.radius},sphere{pC4,C.radius},ip4)){
+   if (!trilaterate_verify(A,B,C)){
       return false;
    }
 
-#if defined SHOW_MATRIX_CALC
-   //#######################################################################
+#if defined WANT_MATRIX_CALC
+   auto const pA0v = quan::fusion::make_column_matrix(A.centre);
+   auto const pB0v = quan::fusion::make_column_matrix(B.centre);
+   auto const pC0v = quan::fusion::make_column_matrix(C.centre);
+#endif
+
+#if defined DEBUG_PRINT
+   std::cout << "\ntranslate system so that A is at origin --------------\n\n";
+#endif
+
+#if defined WANT_VECT_CALC
+   auto const pA_norm = A.centre - A.centre;
+   assert ( (pA_norm == point{0_km,0_km,0_km}) );
+   auto const pB1 = B.centre - A.centre;
+   assert( abs(pB1.x) > epsilon_km);
+   auto const pC1 = C.centre - A.centre;
+#endif
+#if defined WANT_MATRIX_CALC
+   auto mt = quan::fusion::make_translation_matrix(-A.centre);
+   auto const pAv_norm = pA0v * mt   ;
+   auto const pB1v = pB0v * mt   ;
+   auto const pC1v = pC0v * mt   ;
+#endif
+
+#if defined DEBUG_PRINT
+   #if defined SHOW_VECT_CALC
+      std::cout << "pA_norm = " << pA_norm << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pAv_norm, "pAv_norm = ");
+   #endif
+    #if defined SHOW_VECT_CALC
+   std::cout << "pB1 = " << pB1 << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pB1v, "pB1v = ");
+   #endif
+   #if defined SHOW_VECT_CALC
+       std::cout << "pC1 = " << pC1 << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pC1v, "pC1v = ");
+   #endif
+#endif   
+   // transform 2 ---------------------------------
+#if defined USE_MATRIX_CALC
+   assert( (pB1v.at<0,3>()== 1) );
+   auto const y_angle = quan::atan2(pB1v.at<0,2>(), pB1v.at<0,0>());
+#else
+   auto const y_angle = quan::atan2(pB1.z,pB1.x);
+#endif
+#if defined DEBUG_PRINT
+   std::cout << "\nrotate around y-axis by " << quan::angle::deg{y_angle} << " so that pB.z == 0)\n\n";
+#endif
+#if defined WANT_MATRIX_CALC
+   auto const mry = quan::fusion::make_3d_y_rotation_matrix<quan::length::km>(-y_angle);
+#endif
+#if defined WANT_VECT_CALC
+   quan::three_d::y_rotation y_rotate{-y_angle};
+#endif
+
+#if defined WANT_MATRIX_CALC
+   auto const pB2v = pB1v * mry;
+   auto const pC2v = pC1v * mry;
+#endif
+#if defined WANT_VECT_CALC
+   auto const pB2 = y_rotate(pB1); 
+   auto const pC2 = y_rotate(pC1);
+#endif
+#if defined DEBUG_PRINT
+   #if defined SHOW_VECT_CALC
+      std::cout << "pB2 = " << pB2 << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pB2v, "pB2v = ");
+   #endif
+   #if defined SHOW_VECT_CALC
+       std::cout << "pC2 = " << pC2 << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pC2v, "pC2v = ");
+   #endif
+#endif
+  
+#if defined USE_MATRIX_CALC
+   assert( (pB2v.at<0,3>()== 1) );
+   auto const z_angle = quan::atan2(pB2v.at<0,1>(),pB2v.at<0,0>());
+#else
+   auto const z_angle = quan::atan2(pB2.y,pB2.x);
+#endif
+
+#if defined DEBUG_PRINT
+   std::cout << "\nrotate around z-axis by " << quan::angle::deg{z_angle} << " so that pB.y == 0\n\n";
+#endif
+
+#if defined WANT_MATRIX_CALC
+   auto mrz = quan::fusion::make_3d_z_rotation_matrix<quan::length::km>(-z_angle);
+   auto pBv_norm = pB2v * mrz;
+   auto pC3v = pC2v * mrz;
+#endif
+#if defined WANT_VECT_CALC
+   quan::three_d::z_rotation z_rotate{-z_angle};
+   auto const pB_norm = z_rotate(pB2); 
+   assert(abs(pB_norm.z) < epsilon_km);
+   assert(abs(pB_norm.y) < epsilon_km);
+ 
+   auto const pC3 = z_rotate(pC2);
+   assert( abs(pC3.x) > epsilon_km);
+#endif
+
+#if defined DEBUG_PRINT
+   #if defined SHOW_VECT_CALC
+      std::cout << "pB_norm = " << pB_norm << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pBv_norm, "pBv_norm = ");
+   #endif
+   #if defined SHOW_VECT_CALC
+      std::cout << "pC3 = " << pC3 << '\n';
+   #endif
+   #if defined SHOW_MATRIX_CALC
+      display(pC3v, "pC3v = ");
+   #endif
+#endif
+ 
+
+#if defined WANT_MATRIX_CALC
+   assert( (pC3v.at<0,3>()== 1) );
+   auto const x_angle = quan::atan2(pC3v.at<0,2>(),pC3v.at<0,1>());
+#else
+   auto const x_angle = quan::atan2(pC3.z,pC3.y);
+#endif
+
+#if defined DEBUG_PRINT
+   std::cout << "\nrotate around x-axis by " << quan::angle::deg{x_angle} << " so that pC.z == 0\n\n";
+#endif
+
+#if defined WANT_MATRIX_CALC
+   auto mrx = quan::fusion::make_3d_x_rotation_matrix<quan::length::km>(-x_angle);
+   #if defined SHOW_MATRIX_CALC
+      display(mrx, "mrx = " ) ;
+   #endif
+#endif
+#if defined WANT_VECT_CALC
+   quan::three_d::x_rotation x_rotate{-x_angle};
+   auto const pC_norm = x_rotate(pC3);
+   assert(abs(pC_norm.z) < epsilon_km);
+   #if defined SHOW_VECT_CALC
+      std::cout << "pC_norm = " << pC_norm << '\n';
+   #endif
+#endif
+#if defined WANT_MATRIX_CALC
+   auto const pCv_norm = pC3v * mrx;
+#endif
+
+   point ip_norm;
+#if defined WANT_MATRIX_CALC
+   if ( !ll_trilaterate(
+             sphere{to_vect3D(pAv_norm),A.radius}
+            ,sphere{to_vect3D(pBv_norm),B.radius}
+            ,sphere{to_vect3D(pCv_norm),C.radius}
+            ,ip_norm
+         )
+   ){
+      return false;
+   }
+#else
+   if ( !ll_trilaterate(sphere{pA_norm,A.radius},sphere{pB_norm,B.radius},sphere{pC_norm,C.radius},ip_norm)){
+      return false;
+   }
+#endif
+
+#if defined USE_MATRIX_CALC
    auto mrx_dash = quan::fusion::make_3d_x_rotation_matrix<quan::length::km>(x_angle);
    auto mrz_dash = quan::fusion::make_3d_z_rotation_matrix<quan::length::km>(z_angle);
    auto mry_dash = quan::fusion::make_3d_y_rotation_matrix<quan::length::km>(y_angle);
@@ -258,48 +364,19 @@ bool trilaterate(sphere const& A, sphere const & B, sphere const & C,point & out
 
    auto mxtot_dash = mrx_dash * mrz_dash * mry_dash * mt_dash;
 
-   auto ip4v = quan::fusion::make_column_matrix(ip4);
-
-   auto ip0v = ip4v * mxtot_dash;
-#if defined DEBUG_PRINT
-   display(ip0v,"ip0v = ");
-#endif
-
-#endif
-   //#######################################################################
-
+   auto ipv_norm = quan::fusion::make_column_matrix(ip_norm);
+   auto ip0v = ipv_norm * mxtot_dash;
+   out = to_vect3D(ip0v);
+#else
    quan::three_d::x_rotation x_unrotate(x_angle);
-
-   point const ip3 = x_unrotate(ip4);
-#if defined DEBUG_PRINT
-   point const pA3_dash = x_unrotate(pA4);
-   point const pB3_dash = x_unrotate(pB4);
-   point const pC3_dash = x_unrotate(pC4);
-#endif
+   point const ip3 = x_unrotate(ip_norm);
    quan::three_d::z_rotation z_unrotate(z_angle);
    point const ip2 = z_unrotate(ip3);
-#if defined DEBUG_PRINT
-   point pA2_dash = z_unrotate(pA3_dash);
-   point pB2_dash = z_unrotate(pB3_dash);
-   point pC2_dash = z_unrotate(pC3_dash);
-#endif
    quan::three_d::y_rotation y_unrotate(y_angle);
    point ip1 = y_unrotate(ip2);
-#if defined DEBUG_PRINT
-   point pA1_dash = y_unrotate(pA2_dash);
-   point pB1_dash = y_unrotate(pB2_dash);
-   point pC1_dash = y_unrotate(pC2_dash);
-#endif
-   point ip0 = ip1 + pA0;
-#if defined DEBUG_PRINT
-   point pA0_dash = pA1_dash + pA0;
-   point pB0_dash = pB1_dash + pA0;
-   point pC0_dash = pC1_dash + pA0; 
-   std::cout << "pA0_dash = " << pA0_dash << '\n';
-   std::cout << "pB0_dash = " << pB0_dash << '\n';
-   std::cout << "pC0_dash = " << pC0_dash << '\n';
-#endif
+   point ip0 = ip1 + A.centre;
    out = ip0;
+#endif
    return true;
 }
 
@@ -333,7 +410,7 @@ int main()
    point intersection_point;
    if ( trilaterate(A,B,C,intersection_point)){
 #if defined DEBUG_PRINT
-     std::cout << "intersection point = " << intersection_point << "\n";
+     std::cout << "\nintersection point = " << intersection_point << "\n\n";
 
 #endif
      {
@@ -344,9 +421,9 @@ int main()
         out << "color(\"blue\"){\n";
         out << "   // sphere A\n";
         out << "   show_sphere(" << A.centre/1_km << ", " << A.radius.numeric_value() << ");\n";
-       out <<  "   // sphere B\n";
+        out << "   // sphere B\n";
         out << "   show_sphere(" << C.centre/1_km << ", " << C.radius.numeric_value() << ");\n";
-       out <<  "   // sphere C\n";
+        out << "   // sphere C\n";
         out << "   show_sphere(" << B.centre/1_km << ", " << B.radius.numeric_value() << ");\n"; 
         out << "}\n\n";
 
