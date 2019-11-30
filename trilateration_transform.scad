@@ -12,12 +12,12 @@ module show_sphere(pos,radius)
 }
 
 color("blue"){
-   show_sphere([4, 5, 6], 7);
+   show_sphere([4, 5, 6], 7.5);
    show_sphere([10, 11, 5.6], 7);
    show_sphere([13, 4.5, 5.5], 5);
 }
 
 color("yellow"){
-   show_sphere([10.0651, 5.18095, 9.4903], 1);
+   show_sphere([10.4923, 5.37433, 9.73637], 1);
 }
 
